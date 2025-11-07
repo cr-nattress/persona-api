@@ -1,6 +1,6 @@
 # 📋 Complete Backlog Index
 
-**Persona-API v1.0** | Generated: 2025-11-06 | Total: 7 Epics | 23 Stories | 80+ Tasks
+**Persona-API v1.0** | Generated: 2025-11-06 | Total: 8 Epics | 25 Stories | 85+ Tasks
 
 ---
 
@@ -8,12 +8,12 @@
 
 | Metric | Value |
 |--------|-------|
-| **Total Story Points** | 156 |
-| **Number of Epics** | 7 |
-| **Number of Stories** | 23 |
-| **Number of Tasks** | 80+ |
-| **Estimated Duration** | 12-16 weeks (5-10 devs) |
-| **Critical Path** | EPIC-01 → EPIC-02/03 → EPIC-04 → EPIC-05 → EPIC-06/07 |
+| **Total Story Points** | 164 |
+| **Number of Epics** | 8 |
+| **Number of Stories** | 25 |
+| **Number of Tasks** | 85+ |
+| **Estimated Duration** | 12-17 weeks (5-10 devs) |
+| **Critical Path** | EPIC-01 → EPIC-02/03 → EPIC-04 → EPIC-05 → EPIC-06/07 (EPIC-08 can be parallel) |
 
 ---
 
@@ -230,6 +230,31 @@
 
 ---
 
+## 🎯 EPIC-08: Enhance POST /persona Endpoint with URL Support and Optimized Response
+**Status:** 📋 Ready | **Points:** 16 | **Priority:** 🟡 Medium
+
+### Stories & Tasks
+
+#### US-08-01: Create PersonaCreateResponse Model (3 pts)
+- TASK-08-01-01: Create PersonaCreateResponse model
+- TASK-08-01-02: Add tests for PersonaCreateResponse model
+
+#### US-08-02: Update POST /v1/persona Endpoint (5 pts)
+- TASK-08-02-01: Update POST /v1/persona endpoint response model
+- TASK-08-02-02: Update integration tests for new response format
+- TASK-08-02-03: Verify Swagger documentation and test endpoint
+
+#### US-08-03: Add URL Parameter Support to CreatePersonaRequest (8 pts)
+- TASK-08-03-01: Update CreatePersonaRequest model with URLs parameter
+- TASK-08-03-02: Implement URL fetching utility with error handling
+- TASK-08-03-03: Update POST endpoint to handle URL inputs
+- TASK-08-03-04: Add integration tests for URL input flow
+- TASK-08-03-05: Verify Swagger documentation for updated request model
+
+**Subtotal:** 3 Stories | 10 Tasks | 16 Points
+
+---
+
 ## 📊 Summary by Epic
 
 | Epic | Stories | Tasks | Points | Priority |
@@ -241,7 +266,8 @@
 | EPIC-05 | 4 | 16 | 16 | 🟡 |
 | EPIC-06 | 3 | 18 | 18 | 🟡 |
 | EPIC-07 | 3 | 18 | 18 | 🟢 |
-| **TOTAL** | **23** | **104** | **156** | — |
+| EPIC-08 | 2 | 5 | 8 | 🟡 |
+| **TOTAL** | **25** | **109** | **164** | — |
 
 ---
 
@@ -289,6 +315,7 @@
 - ⚙️ [EPIC-05: Service](./epic-05-persona-service/EPIC.md)
 - ✅ [EPIC-06: Testing](./epic-06-testing-validation/EPIC.md)
 - 🚀 [EPIC-07: Deployment](./epic-07-documentation-deployment/EPIC.md)
+- 📝 [EPIC-08: Update Response Format](./epic-08-update-create-response/EPIC.md)
 
 ---
 
