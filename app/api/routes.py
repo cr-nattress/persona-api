@@ -144,6 +144,7 @@ async def create_persona(
         200: {"description": "Personas retrieved successfully"},
         500: {"description": "Internal server error"},
     },
+    include_in_schema=False,
 )
 async def list_personas(
     limit: int = Query(10, ge=1, le=100, description="Items per page"),
@@ -199,6 +200,7 @@ async def list_personas(
         400: {"description": "Invalid request data"},
         500: {"description": "Internal server error"},
     },
+    include_in_schema=False,
 )
 async def merge_personas(
     persona_id_1: str = Query(..., description="UUID of first persona"),
@@ -260,6 +262,7 @@ async def merge_personas(
         400: {"description": "Invalid request data"},
         500: {"description": "Internal server error"},
     },
+    include_in_schema=False,
 )
 async def batch_generate_personas(
     raw_texts: List[str],
@@ -314,6 +317,7 @@ async def batch_generate_personas(
         400: {"description": "Invalid query"},
         500: {"description": "Internal server error"},
     },
+    include_in_schema=False,
 )
 async def search_personas(
     q: str = Query(..., min_length=1, description="Search query (name, role, keywords)"),
@@ -358,6 +362,7 @@ async def search_personas(
         200: {"description": "Stats retrieved successfully"},
         500: {"description": "Internal server error"},
     },
+    include_in_schema=False,
 )
 async def get_persona_stats() -> Dict[str, Any]:
     """
@@ -396,6 +401,7 @@ async def get_persona_stats() -> Dict[str, Any]:
         400: {"description": "Invalid format"},
         500: {"description": "Internal server error"},
     },
+    include_in_schema=False,
 )
 async def export_personas(
     format: str = Query("json", description="Export format (json)"),
