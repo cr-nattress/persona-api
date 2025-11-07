@@ -1,0 +1,29 @@
+# Web Framework
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+pydantic>=2.7.0
+pydantic-settings>=2.2.0
+
+# LLM & AI
+langchain>=0.1.15
+langchain-openai>=0.1.0
+openai>=1.10.0
+
+# Database
+supabase>=2.4.0
+
+# Configuration & Secrets
+python-dotenv>=1.0.0
+
+# Logging
+loguru>=0.7.2
+
+# Testing
+pytest>=7.4.3
+pytest-asyncio>=0.23.0
+httpx>=0.25.1
+
+# Optional: Development tools
+black>=24.1.0
+isort>=5.13.0
+ruff>=0.2.0
