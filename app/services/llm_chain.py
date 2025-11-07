@@ -8,12 +8,13 @@ Implements a two-step pipeline:
 
 import json
 import re
+import time
 from pathlib import Path
 from typing import Dict, Any, Optional
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from app.core.config import settings
-from app.core.logging import get_logger
+from app.core.logging import get_logger, log_llm_request, log_llm_response
 
 logger = get_logger(__name__)
 
@@ -98,12 +99,33 @@ class PersonaLLMChain:
             # Create chain
             chain = prompt | self.model
 
-            # Run chain
+            # Log LLM request
+            log_llm_request(
+                model=settings.openai_model,
+                messages=[
+                    {"role": "system", "content": self.step1_system},
+                    {"role": "user", "content": self.step1_user.replace("{raw_text}", raw_text[:200])},
+                ],
+                temperature=0.7,
+                max_tokens=2000,
+            )
+
+            # Run chain with timing
             logger.debug(f"Processing text: {raw_text[:100]}...")
+            start_time = time.time()
             result = await chain.ainvoke({"raw_text": raw_text})
+            latency_ms = (time.time() - start_time) * 1000
 
             cleaned_text = result.content
-            logger.info(f"Step 1 completed: {len(cleaned_text)} chars cleaned")
+
+            # Log LLM response
+            log_llm_response(
+                model=settings.openai_model,
+                response_text=cleaned_text,
+                latency_ms=latency_ms,
+            )
+
+            logger.info(f"Step 1 completed: {len(cleaned_text)} chars cleaned (latency: {latency_ms:.0f}ms)")
             return cleaned_text
 
         except Exception as e:
@@ -137,15 +159,35 @@ class PersonaLLMChain:
             # Create chain
             chain = prompt | self.model
 
-            # Run chain
+            # Log LLM request
+            log_llm_request(
+                model=settings.openai_model,
+                messages=[
+                    {"role": "system", "content": self.step2_system},
+                    {"role": "user", "content": self.step2_user.replace("{cleaned_text}", cleaned_text[:200])},
+                ],
+                temperature=0.7,
+                max_tokens=2000,
+            )
+
+            # Run chain with timing
             logger.debug("Generating persona JSON...")
+            start_time = time.time()
             result = await chain.ainvoke({"cleaned_text": cleaned_text})
+            latency_ms = (time.time() - start_time) * 1000
 
             persona_text = result.content
 
+            # Log LLM response
+            log_llm_response(
+                model=settings.openai_model,
+                response_text=persona_text,
+                latency_ms=latency_ms,
+            )
+
             # Parse JSON
             persona_json = self._safe_json_parse(persona_text)
-            logger.info(f"Step 2 completed: Persona JSON generated")
+            logger.info(f"Step 2 completed: Persona JSON generated (latency: {latency_ms:.0f}ms)")
             return persona_json
 
         except Exception as e:

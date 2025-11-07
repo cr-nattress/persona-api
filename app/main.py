@@ -4,15 +4,36 @@ FastAPI application initialization.
 Main entry point for the Persona-API server.
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from contextlib import asynccontextmanager
 from app.core import settings, setup_logging, get_logger
+from app.core.logging import set_correlation_id, get_correlation_id
 from app.api import router as persona_router
 
 # Initialize logging
 setup_logging(log_level=settings.log_level, environment=settings.environment)
 logger = get_logger(__name__)
+
+
+class CorrelationIDMiddleware(BaseHTTPMiddleware):
+    """Middleware to handle correlation IDs for request tracing."""
+
+    async def dispatch(self, request: Request, call_next):
+        # Check for correlation ID in request headers
+        corr_id = request.headers.get("x-correlation-id")
+        if not corr_id:
+            corr_id = get_correlation_id()
+        else:
+            set_correlation_id(corr_id)
+
+        # Process request
+        response = await call_next(request)
+
+        # Add correlation ID to response headers
+        response.headers["X-Correlation-ID"] = corr_id
+        return response
 
 
 @asynccontextmanager
@@ -45,6 +66,9 @@ app = FastAPI(
     redoc_url="/redoc",
     openapi_url="/openapi.json",
 )
+
+# Add correlation ID middleware (before CORS)
+app.add_middleware(CorrelationIDMiddleware)
 
 # Add CORS middleware
 app.add_middleware(
