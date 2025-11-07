@@ -87,7 +87,8 @@ class TestCreatePersonaResponse:
         """Test POST /v1/persona accepts urls parameter."""
         persona_id = str(uuid4())
 
-        with patch("app.api.routes.get_persona_service") as mock_service_factory:
+        with patch("app.api.routes.get_persona_service") as mock_service_factory, \
+             patch("app.api.routes.URLFetcher") as mock_fetcher_class:
             service = AsyncMock()
             from app.models.persona import PersonaInDB
 
@@ -100,8 +101,11 @@ class TestCreatePersonaResponse:
             service.generate_persona.return_value = mock_persona
             mock_service_factory.return_value = service
 
-            # Note: URL fetching will be implemented in Story 3
-            # For now, just verify the endpoint accepts the urls parameter
+            # Mock URL fetcher
+            mock_fetcher = AsyncMock()
+            mock_fetcher.fetch_multiple = AsyncMock(return_value="Content from URL")
+            mock_fetcher_class.return_value = mock_fetcher
+
             response = client.post(
                 "/v1/persona",
                 json={"urls": ["https://example.com/bio"]},
@@ -113,12 +117,15 @@ class TestCreatePersonaResponse:
             assert "id" in data
             assert "created_at" in data
             assert "updated_at" in data
+            # Verify fetch_multiple was called
+            mock_fetcher.fetch_multiple.assert_called_once()
 
     async def test_create_persona_with_raw_text_and_urls(self, client):
         """Test POST /v1/persona accepts both raw_text and urls."""
         persona_id = str(uuid4())
 
-        with patch("app.api.routes.get_persona_service") as mock_service_factory:
+        with patch("app.api.routes.get_persona_service") as mock_service_factory, \
+             patch("app.api.routes.URLFetcher") as mock_fetcher_class:
             service = AsyncMock()
             from app.models.persona import PersonaInDB
 
@@ -131,6 +138,11 @@ class TestCreatePersonaResponse:
             service.generate_persona.return_value = mock_persona
             mock_service_factory.return_value = service
 
+            # Mock URL fetcher
+            mock_fetcher = AsyncMock()
+            mock_fetcher.fetch_multiple = AsyncMock(return_value="Content from URL")
+            mock_fetcher_class.return_value = mock_fetcher
+
             response = client.post(
                 "/v1/persona",
                 json={
@@ -142,6 +154,8 @@ class TestCreatePersonaResponse:
             assert response.status_code == 201
             data = response.json()
             assert len(data) == 3
+            # Verify fetch_multiple was called
+            mock_fetcher.fetch_multiple.assert_called_once()
 
     async def test_create_persona_without_inputs_returns_validation_error(self, client):
         """Test POST /v1/persona returns 422 when neither raw_text nor urls provided."""

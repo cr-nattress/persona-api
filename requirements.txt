@@ -23,6 +23,9 @@ pytest>=7.4.3
 pytest-asyncio>=0.23.0
 httpx>=0.25.1
 
+# URL Content Extraction
+beautifulsoup4>=4.12.0
+
 # Optional: Development tools
 black>=24.1.0
 isort>=5.13.0

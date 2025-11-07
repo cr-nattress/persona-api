@@ -16,6 +16,7 @@ from app.models.persona import (
     PersonaInDB,
 )
 from app.services.persona_service import get_persona_service
+from app.services.url_fetcher import URLFetcher, URLFetchError
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -79,15 +80,33 @@ async def create_persona(
     try:
         # Determine input source
         input_text = request.raw_text or ""
+
+        # Fetch content from URLs if provided
         if request.urls:
             logger.info(f"Creating persona from {len(request.urls)} URL(s)")
-            # URL fetching will be implemented in Story 3
-            # For now, this is only raw_text support
-            logger.debug(f"URL support coming in next story")
+            try:
+                url_fetcher = URLFetcher()
+                url_content = await url_fetcher.fetch_multiple(
+                    [str(url) for url in request.urls]
+                )
+                # Combine URL content with raw_text if provided
+                if input_text:
+                    input_text = f"{input_text}\n\n---\n\n{url_content}"
+                else:
+                    input_text = url_content
+                logger.debug(f"Combined input text: {len(input_text)} characters")
+
+            except URLFetchError as e:
+                logger.error(f"URL fetch failed: {str(e)}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Failed to fetch content from provided URLs: {str(e)}",
+                )
         else:
             logger.info("Creating persona from raw text")
             logger.debug(f"Input text length: {len(input_text)} chars")
 
+        # Create persona with combined input
         service = get_persona_service()
         persona = await service.generate_persona(input_text)
 
@@ -100,6 +119,9 @@ async def create_persona(
             updated_at=persona.updated_at,
         )
 
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
     except ValueError as e:
         logger.error(f"Validation error creating persona: {e}")
         raise HTTPException(
