@@ -50,16 +50,9 @@ class PersonaSynthesizer:
             persona_json = await self.llm_chain.generate_persona(raw_text)
             logger.info("Persona generated successfully")
 
-            # Step 2: Create PersonaCreate model
-            logger.debug("Creating PersonaCreate model...")
-            persona_create = PersonaCreate(
-                raw_text=raw_text,
-                persona=persona_json,
-            )
-
-            # Step 3: Save to database
+            # Step 2: Save to database
             logger.debug("Persisting persona to database...")
-            persona_in_db = await self.repository.create(persona_create)
+            persona_in_db = await self.repository.create(raw_text, persona_json)
             logger.info(f"Persona saved with ID: {persona_in_db.id}")
 
             return persona_in_db

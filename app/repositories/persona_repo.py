@@ -5,7 +5,7 @@ Provides CRUD operations (Create, Read, Update, Delete) for personas
 with proper error handling and logging.
 """
 
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from uuid import UUID
 from app.models.persona import (
     PersonaCreate,
@@ -27,12 +27,13 @@ class PersonaRepository:
         self.supabase = get_supabase_client()
         self.table_name = "personas"
 
-    async def create(self, persona: PersonaCreate) -> PersonaInDB:
+    async def create(self, raw_text: str, persona_json: Dict[str, Any]) -> PersonaInDB:
         """
         Create a new persona.
 
         Args:
-            persona: PersonaCreate model with raw_text and persona JSON
+            raw_text: Original unstructured text about the person
+            persona_json: Generated persona JSON data
 
         Returns:
             PersonaInDB: Created persona with ID and timestamps
@@ -41,11 +42,11 @@ class PersonaRepository:
             APIError: If database operation fails
         """
         try:
-            logger.debug(f"Creating persona from text: {persona.raw_text[:50]}...")
+            logger.debug(f"Creating persona from text: {raw_text[:50]}...")
 
             data = {
-                "raw_text": persona.raw_text,
-                "persona": persona.persona,
+                "raw_text": raw_text,
+                "persona": persona_json,
             }
 
             response = (
