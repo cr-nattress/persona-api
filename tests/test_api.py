@@ -220,7 +220,7 @@ class TestAPIErrorHandling:
         """Test create persona with invalid JSON."""
         response = client.post(
             "/v1/persona",
-            json={"raw_text": "some text"},  # Missing required 'persona' field
+            json={},  # Missing both raw_text and urls
         )
         assert response.status_code == 422
 

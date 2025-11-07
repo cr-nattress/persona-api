@@ -181,6 +181,15 @@ async def test_persona_2(sample_raw_text, sample_persona_dict) -> PersonaInDB:
     )
 
 
+@pytest.fixture
+def client():
+    """Create test client for API testing."""
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    return TestClient(app)
+
+
 # Pytest configuration
 def pytest_configure(config):
     """Configure pytest."""

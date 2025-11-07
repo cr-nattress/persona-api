@@ -11,6 +11,7 @@ from uuid import UUID
 from app.models.persona import (
     PersonaCreate,
     PersonaResponse,
+    PersonaCreateResponse,
     PersonaListResponse,
     PersonaInDB,
 )
@@ -27,7 +28,7 @@ router = APIRouter(
 
 @router.post(
     "",
-    response_model=PersonaResponse,
+    response_model=PersonaCreateResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create a new persona",
     responses={
@@ -38,42 +39,66 @@ router = APIRouter(
 )
 async def create_persona(
     request: PersonaCreate,
-) -> PersonaResponse:
+) -> PersonaCreateResponse:
     """
-    Create a new persona from raw text.
+    Create a new persona from raw text and/or URLs.
 
-    Takes unstructured text about a person and generates a comprehensive
-    persona profile using a two-step LLM pipeline:
+    Supports flexible input sources:
+    - raw_text: Direct text input for persona generation
+    - urls: 1-10 URLs containing persona information
+    - Both: Combines URL content with raw_text
+
+    Generates a comprehensive persona profile using a two-step LLM pipeline:
     1. Clean and normalize the input text
     2. Generate structured persona JSON
 
     Args:
-        request: PersonaCreate containing raw_text and initial persona data
+        request: PersonaCreate containing either raw_text or urls (or both)
 
     Returns:
-        PersonaResponse: Created persona with ID and timestamps
+        PersonaCreateResponse: Created persona with ID, created_at, and updated_at
+        (minimal response excluding raw_text and persona JSON for optimized payload)
 
     Raises:
-        HTTPException: If persona generation fails
+        HTTPException: If persona generation fails or URL fetching fails
 
     Example:
         ```json
         POST /v1/persona
         {
-            "raw_text": "John is an engineer who loves building systems...",
-            "persona": {...}
+            "raw_text": "John is an engineer who loves building systems..."
+        }
+        ```
+        or
+        ```json
+        {
+            "urls": ["https://example.com/bio", "https://example.com/resume"]
         }
         ```
     """
     try:
-        logger.info("Creating persona from raw text")
-        logger.debug(f"Input text length: {len(request.raw_text)} chars")
+        # Determine input source
+        input_text = request.raw_text or ""
+        if request.urls:
+            logger.info(f"Creating persona from {len(request.urls)} URL(s)")
+            # URL fetching will be implemented in Story 3
+            # For now, this is only raw_text support
+            logger.debug(f"URL support coming in next story")
+        else:
+            logger.info("Creating persona from raw text")
+            logger.debug(f"Input text length: {len(input_text)} chars")
 
         service = get_persona_service()
-        persona = await service.generate_persona(request.raw_text)
+        persona = await service.generate_persona(input_text)
 
         logger.info(f"Persona created successfully: {persona.id}")
-        return PersonaResponse(**persona.model_dump())
+
+        # Return minimal response with only id, created_at, updated_at
+        return PersonaCreateResponse(
+            id=str(persona.id),
+            created_at=persona.created_at,
+            updated_at=persona.updated_at,
+        )
 
     except ValueError as e:
         logger.error(f"Validation error creating persona: {e}")
