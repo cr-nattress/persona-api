@@ -5,8 +5,10 @@ Main entry point for the Persona-API server.
 """
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.core import settings, setup_logging, get_logger
+from app.api import router as persona_router
 
 # Initialize logging
 setup_logging(log_level=settings.log_level, environment=settings.environment)
@@ -39,7 +41,22 @@ app = FastAPI(
     description="Transform raw text into structured persona definitions",
     version="1.0.0",
     lifespan=lifespan,
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
 )
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, restrict to specific origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include API routes
+app.include_router(persona_router)
 
 
 @app.get("/", tags=["Health"])
