@@ -1,0 +1,7 @@
+Please analyze and clean this text about a person:
+
+---
+{raw_text}
+---
+
+Extract and organize the key information into bullet points covering their identity, values, motivations, behavior, communication style, interests, relationships, and goals.

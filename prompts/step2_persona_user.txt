@@ -1,0 +1,7 @@
+Based on these cleaned notes about a person, create a comprehensive persona JSON:
+
+---
+{cleaned_text}
+---
+
+Generate a complete persona JSON object capturing all dimensions of this person's identity, cognition, behavior, values, and goals. Make it detailed and nuanced.

@@ -1,0 +1,65 @@
+{
+  "meta": {
+    "name": "string - Person's name or identifier",
+    "role": "string - Primary role or title",
+    "age_range": "string - Approximate age (e.g., '20s', '30-40')",
+    "location": "string - Geographic location if known",
+    "created_at": "ISO datetime string"
+  },
+  "identity": {
+    "core_description": "string - Who this person fundamentally is",
+    "self_perception": "string - How they see themselves",
+    "archetypes": ["string - Relevant persona archetypes"],
+    "values": ["string - Core values that drive them"],
+    "beliefs": ["string - Core beliefs they hold"]
+  },
+  "cognition": {
+    "thinking_style": "string - How they process information",
+    "decision_making": "string - How they make decisions",
+    "learning_style": "string - Preferred ways to learn",
+    "problem_solving": "string - How they approach problems",
+    "risk_tolerance": "string - Conservative to risk-seeking"
+  },
+  "behavior": {
+    "patterns": ["string - Typical behavioral patterns"],
+    "habits": ["string - Regular habits"],
+    "routines": "string - Daily/weekly routines",
+    "social_behavior": "string - How they interact socially",
+    "energy_level": "string - Overall activity level"
+  },
+  "communication": {
+    "tone": "string - Their typical tone (e.g., friendly, professional, humorous)",
+    "style": "string - Formal/informal, verbose/concise",
+    "preferences": ["string - Communication preferences"],
+    "vocabulary": "string - Level and type of language used",
+    "non_verbal": "string - How they use non-verbal communication"
+  },
+  "strengths": [
+    "string - Skills and abilities they excel at"
+  ],
+  "challenges": [
+    "string - Areas they find difficult"
+  ],
+  "interests": {
+    "primary": ["string - Main interests"],
+    "secondary": ["string - Secondary interests"],
+    "passions": ["string - Things they're passionate about"]
+  },
+  "skills": {
+    "hard_skills": ["string - Technical/tangible skills"],
+    "soft_skills": ["string - Interpersonal/intangible skills"],
+    "expertise": ["string - Areas of deep knowledge"]
+  },
+  "motivations": {
+    "primary_drives": ["string - What motivates them most"],
+    "goals": ["string - What they want to achieve"],
+    "aspirations": "string - Longer-term aspirations",
+    "fears": ["string - What they fear or want to avoid"]
+  },
+  "relationships": {
+    "relational_style": "string - How they form and maintain relationships",
+    "role_in_groups": "string - How they typically function in groups",
+    "preferred_relationships": "string - Types of relationships they prefer",
+    "influence_on_others": "string - How they impact others"
+  }
+}
