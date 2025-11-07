@@ -12,7 +12,7 @@ class PersonaBase(BaseModel):
     """Base persona model with common fields."""
 
     raw_text: str = Field(..., description="Original unstructured text input")
-    persona: Dict[str, Any] = Field(..., description="Structured persona JSON output")
+    persona: Optional[Dict[str, Any]] = Field(None, description="Structured persona JSON output")
 
 
 class PersonaCreate(PersonaBase):
