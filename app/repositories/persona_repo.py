@@ -42,12 +42,33 @@ class PersonaRepository:
             APIError: If database operation fails
         """
         try:
-            logger.debug(f"Creating persona from text: {raw_text[:50]}...")
+            # Detailed input validation logging
+            logger.debug(f"PersonaRepository.create() called")
+            logger.debug(f"  - raw_text type: {type(raw_text)}, length: {len(raw_text) if isinstance(raw_text, str) else 'N/A'}")
+            logger.debug(f"  - raw_text preview: {raw_text[:100] if isinstance(raw_text, str) else repr(raw_text)}")
+            logger.debug(f"  - persona_json type: {type(persona_json)}")
+            logger.debug(f"  - persona_json is dict: {isinstance(persona_json, dict)}")
+
+            if isinstance(persona_json, dict):
+                logger.debug(f"  - persona_json keys: {list(persona_json.keys())}")
+                logger.debug(f"  - persona_json size: {len(str(persona_json))} chars")
+                logger.debug(f"  - persona_json preview: {str(persona_json)[:300]}")
+            else:
+                logger.debug(f"  - persona_json is NOT a dict! It is: {repr(persona_json)[:300]}")
+
+            logger.debug(f"Creating persona from text: {raw_text[:50] if isinstance(raw_text, str) else repr(raw_text)[:50]}...")
 
             data = {
                 "raw_text": raw_text,
                 "persona": persona_json,
             }
+
+            logger.debug(f"About to insert data into '{self.table_name}' table")
+            logger.debug(f"Data structure being inserted:")
+            logger.debug(f"  - 'raw_text' key present: {'raw_text' in data}")
+            logger.debug(f"  - 'persona' key present: {'persona' in data}")
+            logger.debug(f"  - data['raw_text'] type: {type(data['raw_text'])}")
+            logger.debug(f"  - data['persona'] type: {type(data['persona'])}")
 
             response = (
                 self.supabase.client.table(self.table_name)
@@ -55,18 +76,38 @@ class PersonaRepository:
                 .execute()
             )
 
+            logger.debug(f"Supabase insert response received")
+            logger.debug(f"  - response type: {type(response)}")
+            logger.debug(f"  - response.data available: {response.data is not None}")
+
             if not response.data:
+                logger.error(f"No data returned from insert operation. Response: {response}")
                 raise ValueError("No data returned from insert operation")
 
             result = response.data[0]
+            logger.debug(f"Database returned record:")
+            logger.debug(f"  - record type: {type(result)}")
+            logger.debug(f"  - record keys: {list(result.keys()) if isinstance(result, dict) else 'NOT A DICT'}")
+            logger.debug(f"  - record['id']: {result.get('id', 'KEY NOT FOUND')}")
+            logger.debug(f"  - record['raw_text'] type: {type(result.get('raw_text', 'NOT FOUND'))}")
+            logger.debug(f"  - record['persona'] type: {type(result.get('persona', 'NOT FOUND'))}")
+
             logger.info(f"Persona created successfully: {result['id']}")
+
+            logger.debug(f"About to instantiate PersonaInDB(**result)")
+            logger.debug(f"  - result keys being passed: {list(result.keys())}")
 
             return PersonaInDB(**result)
         except APIError as e:
             logger.error(f"API error creating persona: {e}")
+            logger.error(f"  - APIError type: {type(e).__name__}")
+            logger.error(f"  - APIError details: {str(e)}")
             raise
         except Exception as e:
             logger.error(f"Error creating persona: {e}")
+            logger.error(f"  - Exception type: {type(e).__name__}")
+            logger.error(f"  - Exception args: {e.args}")
+            logger.error(f"  - Full traceback:", exc_info=True)
             raise
 
     async def read(self, persona_id: UUID) -> Optional[PersonaInDB]:

@@ -207,32 +207,67 @@ class PersonaLLMChain:
         Raises:
             ValueError: If JSON cannot be parsed
         """
+        logger.debug(f"_safe_json_parse() called")
+        logger.debug(f"  - input text type: {type(text)}")
+        logger.debug(f"  - input text length: {len(text) if isinstance(text, str) else 'N/A'}")
+        logger.debug(f"  - input text preview: {text[:200] if isinstance(text, str) else repr(text)[:200]}")
+
         try:
             # Try direct parse first
-            return json.loads(text)
-        except json.JSONDecodeError:
+            logger.debug("Attempting direct JSON parse...")
+            result = json.loads(text)
+            logger.debug(f"Direct JSON parse successful! Keys: {list(result.keys()) if isinstance(result, dict) else 'NOT A DICT'}")
+            return result
+        except json.JSONDecodeError as e:
+            logger.debug(f"Direct parse failed: {e}")
             pass
 
         # Try to extract JSON from markdown code blocks
         try:
+            logger.debug("Attempting markdown code block extraction...")
             match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
             if match:
-                return json.loads(match.group(1))
-        except (json.JSONDecodeError, AttributeError):
+                logger.debug(f"Found markdown block, attempting to parse...")
+                result = json.loads(match.group(1))
+                logger.debug(f"Markdown block parse successful! Keys: {list(result.keys()) if isinstance(result, dict) else 'NOT A DICT'}")
+                return result
+            else:
+                logger.debug("No markdown code block found")
+        except (json.JSONDecodeError, AttributeError) as e:
+            logger.debug(f"Markdown block parse failed: {e}")
             pass
 
         # Try to extract JSON object directly
         try:
+            logger.debug("Attempting direct JSON object extraction (brace matching)...")
             # Find the first { and last }
             start = text.find("{")
             end = text.rfind("}") + 1
+            logger.debug(f"  - First opening brace at position: {start}")
+            logger.debug(f"  - Last closing brace at position: {end - 1}")
+
             if start != -1 and end > start:
-                return json.loads(text[start:end])
-        except json.JSONDecodeError:
+                json_str = text[start:end]
+                logger.debug(f"  - Extracted substring length: {len(json_str)}")
+                logger.debug(f"  - Extracted substring preview: {json_str[:300]}")
+
+                result = json.loads(json_str)
+                logger.debug(f"Brace matching parse successful! Keys: {list(result.keys()) if isinstance(result, dict) else 'NOT A DICT'}")
+                return result
+            else:
+                logger.debug(f"Could not find valid braces: start={start}, end={end}")
+        except json.JSONDecodeError as e:
+            logger.debug(f"Brace matching parse failed: {e}")
             pass
 
         # If all else fails, log and raise
-        logger.error(f"Could not parse JSON from: {text[:200]}")
+        logger.error(f"Could not parse JSON from text")
+        logger.error(f"  - Text length: {len(text)}")
+        logger.error(f"  - Text preview: {text[:500]}")
+        has_open_brace = '{' in text
+        has_close_brace = '}' in text
+        logger.error(f"  - Text contains opening brace: {has_open_brace}")
+        logger.error(f"  - Text contains closing brace: {has_close_brace}")
         raise ValueError("Could not parse JSON response from LLM")
 
     async def generate_persona(self, raw_text: str) -> Dict[str, Any]:
@@ -251,25 +286,48 @@ class PersonaLLMChain:
         try:
             logger.info("Starting persona generation pipeline")
             logger.debug(f"Input text length: {len(raw_text)} chars")
+            logger.debug(f"Input raw_text type: {type(raw_text)}")
+            logger.debug(f"Input raw_text preview: {raw_text[:150]}")
 
             # Step 1: Clean text
+            logger.debug("Executing Step 1: Clean text...")
             cleaned_text = await self.step1_clean_text(raw_text)
+            logger.debug(f"Step 1 complete: cleaned_text type={type(cleaned_text)}, length={len(cleaned_text)}")
 
             # Step 2: Populate persona
+            logger.debug("Executing Step 2: Populate persona...")
             persona = await self.step2_populate_persona(cleaned_text)
 
+            logger.debug(f"Step 2 complete: persona type={type(persona)}")
+            logger.debug(f"Step 2 result is dict: {isinstance(persona, dict)}")
+            if isinstance(persona, dict):
+                logger.debug(f"Step 2 result keys: {list(persona.keys())}")
+            else:
+                logger.debug(f"Step 2 result is NOT a dict! It's: {repr(persona)[:300]}")
+
             # Add metadata
+            logger.debug("Adding metadata to persona...")
             persona["_meta"] = {
                 "raw_text_length": len(raw_text),
                 "cleaned_text_length": len(cleaned_text),
                 "model_used": settings.openai_model,
             }
 
+            logger.debug(f"Final persona object:")
+            logger.debug(f"  - type: {type(persona)}")
+            logger.debug(f"  - is dict: {isinstance(persona, dict)}")
+            logger.debug(f"  - keys: {list(persona.keys()) if isinstance(persona, dict) else 'NOT A DICT'}")
+            logger.debug(f"  - size: {len(str(persona))} chars")
+            logger.debug(f"  - preview: {str(persona)[:400]}")
+
             logger.info("Persona generation pipeline completed successfully")
             return persona
 
         except Exception as e:
             logger.error(f"Persona generation pipeline failed: {e}")
+            logger.error(f"  - Exception type: {type(e).__name__}")
+            logger.error(f"  - Exception details: {str(e)}")
+            logger.error(f"  - Full traceback: ", exc_info=True)
             raise
 
 

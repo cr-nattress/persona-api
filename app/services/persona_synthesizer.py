@@ -44,21 +44,40 @@ class PersonaSynthesizer:
         try:
             logger.info("Starting persona generation and save workflow")
             logger.debug(f"Input text length: {len(raw_text)} chars")
+            logger.debug(f"Input raw_text type: {type(raw_text)}")
+            logger.debug(f"Input raw_text preview: {raw_text[:200] if isinstance(raw_text, str) else repr(raw_text)}")
 
             # Step 1: Generate persona using LLM
             logger.debug("Generating persona with LLM chain...")
             persona_json = await self.llm_chain.generate_persona(raw_text)
             logger.info("Persona generated successfully")
 
+            # Detailed logging about the generated persona
+            logger.debug(f"Generated persona JSON type: {type(persona_json)}")
+            logger.debug(f"Generated persona JSON keys: {list(persona_json.keys()) if isinstance(persona_json, dict) else 'NOT A DICT'}")
+            logger.debug(f"Generated persona JSON size: {len(str(persona_json))} chars")
+            logger.debug(f"Generated persona JSON preview: {str(persona_json)[:500]}")
+
             # Step 2: Save to database
             logger.debug("Persisting persona to database...")
+            logger.debug(f"About to call repository.create() with:")
+            logger.debug(f"  - raw_text type: {type(raw_text)}, length: {len(raw_text) if isinstance(raw_text, str) else 'N/A'}")
+            logger.debug(f"  - persona_json type: {type(persona_json)}, keys: {list(persona_json.keys()) if isinstance(persona_json, dict) else 'NOT A DICT'}")
+
             persona_in_db = await self.repository.create(raw_text, persona_json)
+
+            logger.debug(f"Repository.create() returned PersonaInDB object")
+            logger.debug(f"  - ID: {persona_in_db.id}")
+            logger.debug(f"  - created_at: {persona_in_db.created_at}")
+            logger.debug(f"  - updated_at: {persona_in_db.updated_at}")
             logger.info(f"Persona saved with ID: {persona_in_db.id}")
 
             return persona_in_db
 
         except Exception as e:
             logger.error(f"Persona generation and save failed: {e}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            logger.error(f"Exception traceback: ", exc_info=True)
             raise ValueError(
                 f"Failed to generate and save persona: {e}"
             ) from e

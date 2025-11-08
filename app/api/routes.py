@@ -78,23 +78,42 @@ async def create_persona(
         ```
     """
     try:
+        # Detailed request validation logging
+        logger.debug(f"create_persona() endpoint called")
+        logger.debug(f"  - request type: {type(request)}")
+        logger.debug(f"  - request class: {request.__class__.__name__}")
+
         # Determine input source
+        logger.debug(f"Processing request input:")
+        logger.debug(f"  - request.raw_text type: {type(request.raw_text)}")
+        logger.debug(f"  - request.raw_text value: {request.raw_text if request.raw_text else 'None or empty'}")
+        logger.debug(f"  - request.urls type: {type(request.urls)}")
+        logger.debug(f"  - request.urls value: {request.urls if request.urls else 'None or empty'}")
+
         input_text = request.raw_text or ""
+
+        logger.debug(f"Initial input_text: type={type(input_text)}, length={len(input_text)}")
 
         # Fetch content from URLs if provided
         if request.urls:
             logger.info(f"Creating persona from {len(request.urls)} URL(s)")
             try:
                 url_fetcher = URLFetcher()
+                logger.debug(f"Fetching content from {len(request.urls)} URL(s)...")
                 url_content = await url_fetcher.fetch_multiple(
                     [str(url) for url in request.urls]
                 )
+                logger.debug(f"URL fetch complete: {len(url_content)} chars retrieved")
+
                 # Combine URL content with raw_text if provided
                 if input_text:
                     input_text = f"{input_text}\n\n---\n\n{url_content}"
+                    logger.debug(f"Combined input: raw_text + url_content = {len(input_text)} chars")
                 else:
                     input_text = url_content
-                logger.debug(f"Combined input text: {len(input_text)} characters")
+                    logger.debug(f"Using url_content only: {len(input_text)} chars")
+
+                logger.debug(f"Final combined input_text: type={type(input_text)}, length={len(input_text)}")
 
             except URLFetchError as e:
                 logger.error(f"URL fetch failed: {str(e)}")
@@ -105,31 +124,54 @@ async def create_persona(
         else:
             logger.info("Creating persona from raw text")
             logger.debug(f"Input text length: {len(input_text)} chars")
+            logger.debug(f"Input text type: {type(input_text)}")
+            logger.debug(f"Input text preview: {input_text[:200] if input_text else 'empty'}")
 
         # Create persona with combined input
+        logger.debug(f"About to call service.generate_persona() with:")
+        logger.debug(f"  - input_text type: {type(input_text)}")
+        logger.debug(f"  - input_text length: {len(input_text)}")
+        logger.debug(f"  - input_text preview: {input_text[:300]}")
+
         service = get_persona_service()
         persona = await service.generate_persona(input_text)
+
+        logger.debug(f"service.generate_persona() returned:")
+        logger.debug(f"  - persona type: {type(persona)}")
+        logger.debug(f"  - persona class: {persona.__class__.__name__}")
+        logger.debug(f"  - persona.id: {persona.id}")
+        logger.debug(f"  - persona.created_at: {persona.created_at}")
+        logger.debug(f"  - persona.updated_at: {persona.updated_at}")
 
         logger.info(f"Persona created successfully: {persona.id}")
 
         # Return minimal response with only id, created_at, updated_at
-        return PersonaCreateResponse(
+        logger.debug(f"Building PersonaCreateResponse...")
+        response = PersonaCreateResponse(
             id=str(persona.id),
             created_at=persona.created_at,
             updated_at=persona.updated_at,
         )
+        logger.debug(f"PersonaCreateResponse created successfully")
+        return response
 
     except HTTPException:
         # Re-raise HTTP exceptions as-is
         raise
     except ValueError as e:
         logger.error(f"Validation error creating persona: {e}")
+        logger.error(f"  - ValueError type: {type(e).__name__}")
+        logger.error(f"  - ValueError details: {str(e)}")
+        logger.error(f"  - Full traceback: ", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )
     except Exception as e:
         logger.error(f"Error creating persona: {e}")
+        logger.error(f"  - Exception type: {type(e).__name__}")
+        logger.error(f"  - Exception details: {str(e)}")
+        logger.error(f"  - Full traceback: ", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to generate persona. Please try again.",
