@@ -41,9 +41,23 @@ steps:
       - '--cpu=1'
       - '--timeout=600s'
       - '--max-instances=10'
-      - '--allow-unauthenticated'
       - '--quiet'
     id: Deploy
+    entrypoint: gcloud
+
+  # Step 4: Allow unauthenticated access
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+    args:
+      - run
+      - services
+      - add-iam-policy-binding
+      - $_SERVICE_NAME
+      - '--platform=managed'
+      - '--region=$_DEPLOY_REGION'
+      - '--member=allUsers'
+      - '--role=roles/run.invoker'
+      - '--quiet'
+    id: AllowUnauthenticated
     entrypoint: gcloud
 
 images:
