@@ -51,10 +51,19 @@ def validate_settings() -> Settings:
     try:
         s = Settings()
     except Exception as e:
+        print(f"Configuration load error: {str(e)}", file=sys.stderr)
         raise ValueError(
             f"Configuration validation failed. Ensure all required environment "
-            f"variables are set in .env file. Error: {str(e)}"
+            f"variables are set. Error: {str(e)}"
         ) from e
+
+    # Log loaded configuration (without sensitive values)
+    print(f"Configuration loaded:", file=sys.stderr)
+    print(f"  - environment: {s.environment}", file=sys.stderr)
+    print(f"  - openai_api_key set: {bool(s.openai_api_key)}", file=sys.stderr)
+    print(f"  - supabase_url set: {bool(s.supabase_url)}", file=sys.stderr)
+    print(f"  - supabase_anon_key set: {bool(s.supabase_anon_key)}", file=sys.stderr)
+    print(f"  - log_level: {s.log_level}", file=sys.stderr)
 
     # Additional validation
     if not s.openai_api_key:
