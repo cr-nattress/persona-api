@@ -3,7 +3,7 @@ Persona data models using Pydantic for validation and serialization.
 """
 
 from pydantic import BaseModel, Field, HttpUrl, validator
-from typing import Optional, Any, Dict, List
+from typing import Optional, Any, Dict, List, Union
 from uuid import UUID
 from datetime import datetime
 
@@ -120,3 +120,27 @@ class PersonaListResponse(BaseModel):
     total: int = Field(..., description="Total count of personas")
     limit: int = Field(..., description="Items per page")
     offset: int = Field(..., description="Pagination offset")
+
+
+class ErrorResponse(BaseModel):
+    """
+    Standard error response model.
+
+    Returned when an error occurs during API request processing.
+    Includes detailed error information for debugging and client handling.
+    """
+
+    error: str = Field(..., description="Error message with detailed information")
+    error_type: str = Field(..., description="Type of error (e.g., 'ValueError', 'ValidationError')")
+    status_code: int = Field(..., description="HTTP status code")
+    timestamp: datetime = Field(default_factory=datetime.utcnow, description="Timestamp when error occurred (ISO 8601)")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "error": "Persona not found with ID: 550e8400-e29b-41d4-a716-446655440000",
+                "error_type": "ValueError",
+                "status_code": 404,
+                "timestamp": "2024-11-08T10:30:45.123456"
+            }
+        }

@@ -116,10 +116,15 @@ async def create_persona(
                 logger.debug(f"Final combined input_text: type={type(input_text)}, length={len(input_text)}")
 
             except URLFetchError as e:
-                logger.error(f"URL fetch failed: {str(e)}")
+                error_msg = (
+                    f"Failed to fetch content from provided URLs: {str(e)}. "
+                    f"Please verify that all URLs are accessible and return valid content. "
+                    f"URLs provided: {request.urls}"
+                )
+                logger.error(error_msg)
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Failed to fetch content from provided URLs: {str(e)}",
+                    detail=error_msg,
                 )
         else:
             logger.info("Creating persona from raw text")
@@ -159,22 +164,28 @@ async def create_persona(
         # Re-raise HTTP exceptions as-is
         raise
     except ValueError as e:
-        logger.error(f"Validation error creating persona: {e}")
+        error_msg = f"Validation error creating persona: {str(e)}"
+        logger.error(error_msg)
         logger.error(f"  - ValueError type: {type(e).__name__}")
         logger.error(f"  - ValueError details: {str(e)}")
         logger.error(f"  - Full traceback: ", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
+            detail=error_msg,
         )
     except Exception as e:
-        logger.error(f"Error creating persona: {e}")
+        error_msg = (
+            f"Failed to generate persona: {type(e).__name__}: {str(e)}. "
+            f"This may be due to API issues, invalid input, or service unavailability. "
+            f"Please verify your input and try again. If the problem persists, check the service status."
+        )
+        logger.error(error_msg)
         logger.error(f"  - Exception type: {type(e).__name__}")
         logger.error(f"  - Exception details: {str(e)}")
         logger.error(f"  - Full traceback: ", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to generate persona. Please try again.",
+            detail=error_msg,
         )
 
 
@@ -225,10 +236,16 @@ async def list_personas(
         )
 
     except Exception as e:
-        logger.error(f"Error listing personas: {e}")
+        error_msg = (
+            f"Failed to list personas: {type(e).__name__}: {str(e)}. "
+            f"Parameters: limit={limit}, offset={offset}. "
+            f"Please verify query parameters are valid and try again."
+        )
+        logger.error(error_msg)
+        logger.error(f"  - Full traceback: ", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to list personas.",
+            detail=error_msg,
         )
 
 
@@ -276,21 +293,37 @@ async def merge_personas(
         return PersonaResponse(**merged.model_dump())
 
     except ValueError as e:
-        logger.warning(f"Merge error: {e}")
+        error_msg = f"Merge error: {str(e)}"
+        logger.warning(error_msg)
         if "not found" in str(e).lower():
+            detailed_error = (
+                f"Cannot merge personas: {str(e)}. "
+                f"Persona ID 1: {persona_id_1}, Persona ID 2: {persona_id_2}. "
+                f"Please verify both persona IDs exist and are valid UUIDs."
+            )
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=str(e),
+                detail=detailed_error,
             )
+        detailed_error = (
+            f"Validation error during merge: {str(e)}. "
+            f"Persona IDs: {persona_id_1} and {persona_id_2}"
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
+            detail=detailed_error,
         )
     except Exception as e:
-        logger.error(f"Error merging personas: {e}")
+        error_msg = (
+            f"Failed to merge personas: {type(e).__name__}: {str(e)}. "
+            f"Persona ID 1: {persona_id_1}, Persona ID 2: {persona_id_2}. "
+            f"Please verify both personas exist and try again."
+        )
+        logger.error(error_msg)
+        logger.error(f"  - Full traceback: ", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to merge personas.",
+            detail=error_msg,
         )
 
 
@@ -337,16 +370,24 @@ async def batch_generate_personas(
         return [PersonaResponse(**p.model_dump()) for p in personas]
 
     except ValueError as e:
-        logger.warning(f"Batch error: {e}")
+        error_msg = f"Batch generation validation error: {str(e)}. Input received {len(raw_texts) if raw_texts else 0} text entries."
+        logger.warning(error_msg)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
+            detail=error_msg,
         )
     except Exception as e:
-        logger.error(f"Error in batch generation: {e}")
+        error_msg = (
+            f"Batch generation failed: {type(e).__name__}: {str(e)}. "
+            f"Attempted to generate {len(raw_texts)} personas. "
+            f"Some personas may have been created before the error occurred. "
+            f"Please check created personas and retry the remaining entries."
+        )
+        logger.error(error_msg)
+        logger.error(f"  - Full traceback: ", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to batch generate personas.",
+            detail=error_msg,
         )
 
 
@@ -390,10 +431,16 @@ async def search_personas(
         return [PersonaResponse(**p.model_dump()) for p in results]
 
     except Exception as e:
-        logger.error(f"Error searching personas: {e}")
+        error_msg = (
+            f"Search failed: {type(e).__name__}: {str(e)}. "
+            f"Search query: '{q}', limit: {limit}. "
+            f"Please verify the search query is valid and try again."
+        )
+        logger.error(error_msg)
+        logger.error(f"  - Full traceback: ", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to search personas.",
+            detail=error_msg,
         )
 
 
@@ -428,10 +475,16 @@ async def get_persona_stats() -> Dict[str, Any]:
         return stats
 
     except Exception as e:
-        logger.error(f"Error getting stats: {e}")
+        error_msg = (
+            f"Failed to retrieve statistics: {type(e).__name__}: {str(e)}. "
+            f"The statistics aggregation operation encountered an error. "
+            f"Please try again later."
+        )
+        logger.error(error_msg)
+        logger.error(f"  - Full traceback: ", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get persona statistics.",
+            detail=error_msg,
         )
 
 
@@ -472,16 +525,28 @@ async def export_personas(
         return export_data
 
     except ValueError as e:
-        logger.warning(f"Export format error: {e}")
+        error_msg = (
+            f"Invalid export format: {str(e)}. "
+            f"Requested format: '{format}'. "
+            f"Only 'json' format is currently supported. "
+            f"Limit: {limit}"
+        )
+        logger.warning(error_msg)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
+            detail=error_msg,
         )
     except Exception as e:
-        logger.error(f"Error exporting personas: {e}")
+        error_msg = (
+            f"Export failed: {type(e).__name__}: {str(e)}. "
+            f"Format: {format}, Limit: {limit}. "
+            f"The export operation encountered an error. Please try again with different parameters."
+        )
+        logger.error(error_msg)
+        logger.error(f"  - Full traceback: ", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to export personas.",
+            detail=error_msg,
         )
 
 
@@ -530,16 +595,27 @@ async def get_persona(
         return PersonaResponse(**persona.model_dump())
 
     except ValueError as e:
-        logger.warning(f"Persona not found: {persona_id}")
+        error_msg = (
+            f"Persona not found: {str(e)}. "
+            f"Requested persona ID: {persona_id}. "
+            f"Please verify the persona ID is correct and the persona exists in the system."
+        )
+        logger.warning(error_msg)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
+            detail=error_msg,
         )
     except Exception as e:
-        logger.error(f"Error retrieving persona: {e}")
+        error_msg = (
+            f"Failed to retrieve persona: {type(e).__name__}: {str(e)}. "
+            f"Persona ID: {persona_id}. "
+            f"Please verify the persona ID is valid and try again."
+        )
+        logger.error(error_msg)
+        logger.error(f"  - Full traceback: ", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve persona.",
+            detail=error_msg,
         )
 
 
@@ -585,7 +661,7 @@ async def update_persona_endpoint(
     """
     try:
         logger.info(f"Updating persona: {persona_id}")
-        logger.debug(f"Update text length: {len(request.raw_text)} chars")
+        logger.debug(f"Update text length: {len(request.raw_text) if request.raw_text else 0} chars")
 
         service = get_persona_service()
         persona = await service.update_persona(persona_id, request.raw_text)
@@ -595,22 +671,39 @@ async def update_persona_endpoint(
 
     except ValueError as e:
         if "not found" in str(e).lower():
-            logger.warning(f"Persona not found for update: {persona_id}")
+            error_msg = (
+                f"Cannot update persona: {str(e)}. "
+                f"Persona ID: {persona_id}. "
+                f"Please verify the persona ID exists and is valid."
+            )
+            logger.warning(error_msg)
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=str(e),
+                detail=error_msg,
             )
         else:
-            logger.error(f"Validation error updating persona: {e}")
+            error_msg = (
+                f"Validation error updating persona: {str(e)}. "
+                f"Persona ID: {persona_id}. "
+                f"Text length: {len(request.raw_text) if request.raw_text else 0} chars."
+            )
+            logger.error(error_msg)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=str(e),
+                detail=error_msg,
             )
     except Exception as e:
-        logger.error(f"Error updating persona: {e}")
+        error_msg = (
+            f"Failed to update persona: {type(e).__name__}: {str(e)}. "
+            f"Persona ID: {persona_id}. "
+            f"Text length: {len(request.raw_text) if request.raw_text else 0} chars. "
+            f"The update operation encountered an error. Please verify the input and try again."
+        )
+        logger.error(error_msg)
+        logger.error(f"  - Full traceback: ", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to update persona. Please try again.",
+            detail=error_msg,
         )
 
 
@@ -648,10 +741,15 @@ async def delete_persona_endpoint(
         deleted = await service.delete_persona(persona_id)
 
         if not deleted:
-            logger.warning(f"Persona not found for deletion: {persona_id}")
+            error_msg = (
+                f"Cannot delete persona: persona not found. "
+                f"Persona ID: {persona_id}. "
+                f"Please verify the persona ID is correct and the persona exists in the system."
+            )
+            logger.warning(error_msg)
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Persona not found: {persona_id}",
+                detail=error_msg,
             )
 
         logger.info(f"Persona deleted: {persona_id}")
@@ -659,8 +757,14 @@ async def delete_persona_endpoint(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error deleting persona: {e}")
+        error_msg = (
+            f"Failed to delete persona: {type(e).__name__}: {str(e)}. "
+            f"Persona ID: {persona_id}. "
+            f"The deletion operation encountered an error. Please try again."
+        )
+        logger.error(error_msg)
+        logger.error(f"  - Full traceback: ", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to delete persona.",
+            detail=error_msg,
         )

@@ -4,12 +4,16 @@ FastAPI application initialization.
 Main entry point for the Persona-API server.
 """
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, status, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from contextlib import asynccontextmanager
+from datetime import datetime
 from app.core import settings, setup_logging, get_logger
 from app.core.logging import set_correlation_id, get_correlation_id
+from app.core.exceptions import validation_exception_handler, http_exception_handler, general_exception_handler
 from app.api import router as persona_router
 
 # Initialize logging
@@ -82,6 +86,12 @@ app.add_middleware(
 # Include API routes
 app.include_router(persona_router)
 
+# Register exception handlers
+# Order matters: more specific handlers should come before general ones
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(HTTPException, http_exception_handler)
+app.add_exception_handler(Exception, general_exception_handler)
+
 
 @app.get("/", tags=["Health"])
 async def root():
@@ -101,12 +111,6 @@ async def health_check():
         "service": "persona-api",
         "environment": settings.environment,
     }
-
-
-@app.get("/docs", tags=["Documentation"])
-async def docs_redirect():
-    """Swagger UI documentation."""
-    return {"message": "API documentation available at /docs"}
 
 
 if __name__ == "__main__":
