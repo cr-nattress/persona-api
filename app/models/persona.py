@@ -9,10 +9,13 @@ from datetime import datetime
 
 
 class PersonaBase(BaseModel):
-    """Base persona model with common fields."""
+    """
+    Base persona model with common fields.
 
-    raw_text: str = Field(..., description="Original unstructured text input")
-    persona: Optional[Dict[str, Any]] = Field(None, description="Structured persona JSON output")
+    Represents a computed persona with version tracking and data lineage.
+    """
+
+    persona: Dict[str, Any] = Field(..., description="Structured persona JSON output")
 
 
 class PersonaCreate(BaseModel):
@@ -75,11 +78,25 @@ class PersonaUpdate(BaseModel):
 
 
 class PersonaInDB(PersonaBase):
-    """Model for persona as stored in database."""
+    """
+    Model for persona as stored in database.
+
+    Includes person_id for aggregate root reference, version for tracking
+    persona recomputations, and computed_from_data_ids for data lineage.
+    """
 
     id: UUID = Field(..., description="Unique identifier")
-    created_at: datetime = Field(..., description="Creation timestamp")
-    updated_at: datetime = Field(..., description="Last update timestamp")
+    person_id: UUID = Field(..., description="Foreign key to persons table (aggregate root)")
+    version: int = Field(
+        default=1,
+        description="Version number (increments with each recomputation). Starts at 1."
+    )
+    computed_from_data_ids: List[UUID] = Field(
+        default_factory=list,
+        description="UUID array of person_data IDs used in this computation (lineage tracking)"
+    )
+    created_at: datetime = Field(..., description="When persona first computed for this person")
+    updated_at: datetime = Field(..., description="When persona last recomputed")
 
     class Config:
         from_attributes = True
@@ -89,6 +106,20 @@ class PersonaResponse(PersonaInDB):
     """Model for API responses."""
 
     pass
+
+
+class PersonaWithHistory(PersonaResponse):
+    """
+    Model for persona response with source data history.
+
+    Includes the complete person_data records that were used to
+    compute this persona, enabling full audit trail and lineage.
+    """
+
+    computed_from_data: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="Person_data submission records used to compute this persona"
+    )
 
 
 class PersonaCreateResponse(BaseModel):
