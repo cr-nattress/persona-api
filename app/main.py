@@ -15,6 +15,7 @@ from app.core import settings, setup_logging, get_logger
 from app.core.logging import set_correlation_id, get_correlation_id
 from app.core.exceptions import validation_exception_handler, http_exception_handler, general_exception_handler
 from app.api import router as persona_router
+from app.api.person_routes import router as person_router
 
 # Initialize logging
 setup_logging(log_level=settings.log_level, environment=settings.environment)
@@ -85,6 +86,7 @@ app.add_middleware(
 
 # Include API routes
 app.include_router(persona_router)
+app.include_router(person_router)
 
 # Register exception handlers
 # Order matters: more specific handlers should come before general ones
