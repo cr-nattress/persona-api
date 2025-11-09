@@ -1,211 +1,135 @@
-# 🧠 Persona-API
+# Implementation Plan: Person Aggregate Root with Unstructured Data History
 
-Persona-API is a lightweight Python service that transforms unstructured text into a structured **persona definition JSON**.  
-It uses **LangChain + OpenAI** to clean, optimize, and fill out a structured profile describing identity, cognition, behavior, and preferences — ready for use in AI agents, LangGraph flows, or simulations.
+## Overview
+Redesign the database schema to support a person aggregate root that accumulates unstructured data across multiple API calls, with automatic persona recomputation based on all accumulated data.
 
----
+## Key Requirements
+1. Create person aggregate root as the central entity
+2. Store complete history of unstructured data submissions (one row per API call)
+3. Automatically recompute persona by concatenating all accumulated data and regenerating via LLM
+4. Track persona versions and which person_data records generated each persona
+5. Maintain backward compatibility with existing API
 
-## 🚀 Objective
+## Database Schema Design
 
-> **Persona-API** transforms raw human data (text) into structured persona definitions that describe how someone thinks, decides, and communicates.
+### New Tables Structure
 
-It does this by:
-1. Cleaning and optimizing messy text input.
-2. Generating a JSON persona file using a consistent template.
-3. Persisting results to **Supabase** and returning the generated ID + persona.
-
----
-
-## 🧩 Architecture Overview
-
-| Layer | Description |
-|-------|--------------|
-| **FastAPI** | Exposes simple REST endpoints (`POST`, `GET`, `PATCH`). |
-| **LangChain + OpenAI** | Two-step LLM pipeline (clean → populate persona JSON). |
-| **Supabase** | Stores `id`, `raw_text`, and generated `persona` JSON. |
-| **Logging (Loguru)** | Logs every potentially error-prone step. |
-| **Prompts Folder** | All system and user prompt templates live outside the code. |
-
----
-
-## 🧱 System Design
-
-### ⚙️ Endpoints
-
-| Method | Route | Description |
-|---------|--------|--------------|
-| `POST /v1/persona` | Create a persona from raw text input. Returns `{ id, persona }`. |
-| `GET /v1/persona/{id}` | Retrieve a previously created persona. |
-| `PATCH /v1/persona/{id}` | Re-create and merge persona using new text data. |
-
-### 🧠 Flow
-1. **Receive text input**
-2. **Step 1 (LLM):** Clean + normalize → concise bullet-point summary
-3. **Step 2 (LLM):** Fill out `persona_json_template.json`
-4. **Store + return** the resulting persona and unique ID
-
----
-
-## 🧰 Tech Stack
-
-| Component | Technology |
-|------------|-------------|
-| API | FastAPI |
-| Language Model | LangChain + OpenAI GPT-4o-mini |
-| Database | Supabase (Postgres) |
-| Logging | Loguru |
-| Configuration | dotenv |
-| Schema Validation | Pydantic v2 |
-| Environment | Python 3.10+ |
-
----
-
-## 🗂️ Project Structure
-
-persona_api/
-├─ app/
-│ ├─ main.py
-│ ├─ api/routes.py
-│ ├─ core/{config.py, logging.py}
-│ ├─ db/supabase_client.py
-│ ├─ models/persona.py
-│ ├─ repositories/persona_repo.py
-│ └─ services/
-│ ├─ persona_service.py
-│ ├─ persona_synthesizer.py
-│ └─ llm_chain.py
-├─ prompts/
-│ ├─ step1_clean_system.txt
-│ ├─ step1_clean_user.txt
-│ ├─ step2_persona_system.txt
-│ ├─ step2_persona_user.txt
-│ └─ persona_json_template.json
-├─ requirements.txt
-└─ README.md
-
-pgsql
-Copy code
-
----
-
-## 🧮 Database Schema (Supabase)
-
+#### Table 1: `persons` (Aggregate Root)
 ```sql
-create extension if not exists "uuid-ossp";
-
-create table if not exists public.personas (
-  id uuid primary key default uuid_generate_v4(),
-  raw_text text not null,
-  persona jsonb not null,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+CREATE TABLE public.persons (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-🔧 Setup
-1. Environment
-Create a .env file:
+```
 
-bash
-Copy code
-SUPABASE_URL=https://YOURPROJECT.supabase.co
-SUPABASE_ANON_KEY=YOUR_SUPABASE_KEY
-OPENAI_API_KEY=sk-...
-2. Install dependencies
-bash
-Copy code
-pip install -r requirements.txt
-3. Run server
-bash
-Copy code
-uvicorn app.main:app --reload --port 8080
-🧠 How It Works (LangChain Flow)
-Step 1 — Clean / Normalize
-Prompt: prompts/step1_clean_system.txt + step1_clean_user.txt
+#### Table 2: `person_data` (Unstructured Data History)
+```sql
+CREATE TABLE public.person_data (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  person_id UUID NOT NULL REFERENCES persons(id) ON DELETE CASCADE,
+  raw_text TEXT NOT NULL,
+  source TEXT, -- optional: 'api', 'urls', etc.
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-Model output: concise bullet summary (values, motivations, tone, etc.)
+  CONSTRAINT fk_person_data_person FOREIGN KEY (person_id)
+    REFERENCES persons(id) ON DELETE CASCADE
+);
 
-Step 2 — Populate Persona JSON
-Prompt: prompts/step2_persona_system.txt + step2_persona_user.txt
+CREATE INDEX idx_person_data_person_id ON person_data(person_id);
+CREATE INDEX idx_person_data_created_at ON person_data(created_at);
+```
 
-Model receives the cleaned notes + template JSON and fills out as much as possible.
+#### Table 3: `personas` (Current Persona - Computed Result)
+```sql
+CREATE TABLE public.personas (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  person_id UUID NOT NULL UNIQUE REFERENCES persons(id) ON DELETE CASCADE,
+  persona JSONB NOT NULL,
+  computed_from_data_ids UUID[] NOT NULL,
+  version INTEGER NOT NULL DEFAULT 1,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-Example internal pseudo-chain
-scss
-Copy code
-raw_text
-  ↓
-[ChatOpenAI] step1_clean_normalize()
-  ↓
-clean_notes
-  ↓
-[ChatOpenAI] step2_populate_persona()
-  ↓
-persona JSON (validated & stored)
-🧾 Example Requests
-Create
-bash
-Copy code
-curl -X POST http://localhost:8080/v1/persona \
-  -H "Content-Type: application/json" \
-  -d '{"text":"Values: Integrity, Curiosity; Motivations: build useful systems; Roles: Engineer, Manager; Interests: AI, Architecture; Tools: C#, Node; Tone: encouraging, direct."}'
-Response
+  CONSTRAINT fk_personas_person FOREIGN KEY (person_id)
+    REFERENCES persons(id) ON DELETE CASCADE
+);
 
-json
-Copy code
-{
-  "id": "1c8c4d5b-9f33-4c78-9d2d-bb47f7c2d0e1",
-  "persona": {
-    "meta": { "...": "..." },
-    "identity": { "...": "..." },
-    "...": "..."
-  }
-}
-Get
-bash
-Copy code
-curl http://localhost:8080/v1/persona/1c8c4d5b-9f33-4c78-9d2d-bb47f7c2d0e1
-Update
-bash
-Copy code
-curl -X PATCH http://localhost:8080/v1/persona/1c8c4d5b-9f33-4c78-9d2d-bb47f7c2d0e1 \
-  -H "Content-Type: application/json" \
-  -d '{"text":"Interests: LangGraph, Agno; Tools: Python; Style: concise, lightly humorous."}'
-🧩 Design Patterns Used
-Pattern	Purpose
-Repository Pattern	Separates DB logic (persona_repo) from business logic.
-Service Layer	Coordinates LangChain calls + repo operations.
-Config + Logging	Centralized environment & logging setup.
-Prompt Externalization	All LLM instructions live outside code for easy tuning.
-Two-Step LLM Chain	Clean → Populate ensures reliability and clarity.
+CREATE INDEX idx_personas_person_id ON personas(person_id);
+CREATE INDEX idx_personas_updated_at ON personas(updated_at);
+```
 
-🛠️ Future Enhancements
-Area	Idea
-LangGraph	Replace llm_chain.py with a proper LangGraph node graph.
-Validation	Add JSON Schema validation before saving.
-Caching	Use Supabase or local cache to avoid re-processing identical inputs.
-Async Jobs	Offload long LLM calls using Celery or BackgroundTasks.
-UI	Add a small front-end playground for persona generation.
+## Data Model Changes (Python)
 
-🧑‍💻 Debugging
-All LLM calls, Supabase operations, and JSON parsing steps are logged via Loguru.
+### New Models
+- Person (aggregate root with basic metadata)
+- PersonData (unstructured data submission record)
+- Persona (computed result with version tracking)
 
-Logs show file, function, and line numbers automatically.
+### Updated Models
+- PersonResponse with person_data_count and latest_persona_version
+- PersonaInDB with person_id, version, and computed_from_data_ids
 
-If a JSON parsing error occurs, _safe_json_loads() tries to recover partial output.
+## API Contract Changes
 
-Use --reload mode while developing; logs print to console.
+### New Endpoints
+- `POST /v1/person` - Create new person aggregate root
+- `POST /v1/person/{person_id}/data` - Add unstructured data
+- `POST /v1/person/{person_id}/data-and-regenerate` - Add data and regenerate persona atomically
+- `GET /v1/person/{person_id}` - Get person with metadata
+- `GET /v1/person/{person_id}/data` - List all accumulated data with pagination
+- `GET /v1/person/{person_id}/persona` - Get current persona
+- `GET /v1/person/{person_id}/persona-with-history` - Get persona with source data
 
-✅ Summary
-Persona-API is designed to be:
+### Updated Endpoints
+- `PATCH /v1/person/{person_id}` - Create person and initial persona in one call
 
-Simple to read: clear file structure, minimal magic.
+## Business Logic
 
-Safe to extend: just swap models or prompts.
+### Persona Recomputation Workflow
+1. Fetch ALL person_data records for person (ordered by created_at)
+2. Concatenate all raw_text values in order with separators
+3. Call LLM to generate new persona JSON from accumulated text
+4. Increment persona version number
+5. Update personas table with new version, data IDs, and JSON
+6. Track which person_data IDs were used in computation
 
-Easy to debug: built-in structured logging.
+### Service Layer Methods
+- `create_person()` - Create person aggregate root
+- `add_person_data()` - Add data and trigger recomputation
+- `add_person_data_and_regenerate()` - Atomic: add data + return updated persona
+- `get_person_data_history()` - List accumulated data
+- `get_current_persona()` - Get latest persona
+- `recompute_persona()` - Internal recomputation logic
 
-Future-ready: can evolve into a LangGraph or Agno-based agent builder.
+## Repository Layer
 
-“Turns raw context into a digital mind.”
+### New Repositories
+- PersonRepository - CRUD for persons
+- PersonDataRepository - Store and retrieve unstructured data
 
-yaml
-Copy code
+### Updated Repositories
+- PersonaRepository - Handle versioning and tracking computed_from_data_ids
+
+## Migration Strategy
+
+### Database Migration
+1. Create new tables (persons, person_data, personas)
+2. Data migration script to convert existing personas
+3. Add constraints and indexes
+
+### Application Migration
+1. Deploy new schema first
+2. Deploy new code with backward-compatible endpoints
+3. Gradual client migration to new endpoints
+4. Deprecate old endpoints after adoption
+
+## Benefits
+
+- **Full History**: Every data submission preserved in person_data table
+- **Audit Trail**: Know which data generated which persona version
+- **Incremental Updates**: PATCH adds data without overwriting history
+- **Proper Recomputation**: All accumulated context available for LLM
+- **Data Integrity**: Foreign keys and cascade deletes
+- **Flexible Schema**: JSONB for personas remains unchanged
+- **Backward Compatible**: Old API can be maintained via wrappers
