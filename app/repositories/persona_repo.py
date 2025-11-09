@@ -11,6 +11,7 @@ from app.models.persona import (
     PersonaCreate,
     PersonaUpdate,
     PersonaInDB,
+    PersonaWithHistory,
 )
 from app.db.supabase_client import get_supabase_client
 from app.core.logging import get_logger
@@ -303,6 +304,209 @@ class PersonaRepository:
             raise
         except Exception as e:
             logger.error(f"Error counting personas: {e}")
+            raise
+
+    # ========================================================================
+    # New Methods for Person Aggregate Root Support (Version & Lineage)
+    # ========================================================================
+
+    async def get_by_person_id(self, person_id: UUID) -> Optional[PersonaInDB]:
+        """
+        Retrieve the current persona for a person.
+
+        Each person has exactly one persona record (UNIQUE constraint on person_id).
+        This retrieves the latest/current computed persona for the person.
+
+        Args:
+            person_id: UUID of the person (not the persona)
+
+        Returns:
+            PersonaInDB: Current persona if exists, None otherwise
+
+        Raises:
+            APIError: If database operation fails
+        """
+        try:
+            logger.debug(f"PersonaRepository.get_by_person_id() for person_id: {person_id}")
+
+            response = (
+                self.supabase.client.table(self.table_name)
+                .select("*")
+                .eq("person_id", str(person_id))
+                .execute()
+            )
+
+            if not response.data or len(response.data) == 0:
+                logger.debug(f"No persona found for person: {person_id}")
+                return None
+
+            persona_data = response.data[0]
+            logger.debug(f"Persona retrieved for person {person_id}")
+
+            return PersonaInDB(**persona_data)
+
+        except APIError as e:
+            logger.error(f"Database error reading persona for person {person_id}: {str(e)}")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error reading persona for person {person_id}: {str(e)}")
+            raise APIError(f"Failed to read persona for person: {str(e)}")
+
+    async def create_for_person(
+        self,
+        person_id: UUID,
+        persona_json: Dict[str, Any],
+        data_ids: List[UUID],
+        version: int = 1
+    ) -> PersonaInDB:
+        """
+        Create a new persona for a person with versioning and lineage.
+
+        Args:
+            person_id: UUID of the person (aggregate root)
+            persona_json: Generated persona JSON
+            data_ids: List of person_data IDs used to generate this persona
+            version: Version number (default 1 for first persona)
+
+        Returns:
+            PersonaInDB: Created persona with versioning info
+
+        Raises:
+            APIError: If database operation fails
+        """
+        try:
+            logger.debug(f"PersonaRepository.create_for_person() for person_id: {person_id}")
+            logger.debug(f"  - version: {version}")
+            logger.debug(f"  - data_ids: {data_ids}")
+
+            data = {
+                "person_id": str(person_id),
+                "persona": persona_json,
+                "computed_from_data_ids": [str(uid) for uid in data_ids],
+                "version": version,
+            }
+
+            response = (
+                self.supabase.client.table(self.table_name)
+                .insert(data)
+                .execute()
+            )
+
+            if not response.data or len(response.data) == 0:
+                logger.error(f"No data returned from persona creation")
+                raise APIError("Failed to create persona: no data returned")
+
+            persona_data = response.data[0]
+            logger.info(f"Persona created for person {person_id} with version {version}")
+
+            return PersonaInDB(**persona_data)
+
+        except APIError as e:
+            logger.error(f"Database error creating persona for person {person_id}: {str(e)}")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error creating persona for person {person_id}: {str(e)}")
+            raise APIError(f"Failed to create persona: {str(e)}")
+
+    async def update_by_person_id(
+        self,
+        person_id: UUID,
+        persona_json: Dict[str, Any],
+        data_ids: List[UUID],
+        version: int
+    ) -> PersonaInDB:
+        """
+        Update persona for a person with new version and lineage.
+
+        Increments version, updates persona JSON, and tracks which
+        person_data IDs were used in this computation.
+
+        Args:
+            person_id: UUID of the person
+            persona_json: New persona JSON
+            data_ids: Updated list of person_data IDs used
+            version: New version number
+
+        Returns:
+            PersonaInDB: Updated persona
+
+        Raises:
+            APIError: If database operation fails
+        """
+        try:
+            logger.debug(f"PersonaRepository.update_by_person_id() for person_id: {person_id}")
+            logger.debug(f"  - new version: {version}")
+            logger.debug(f"  - new data_ids count: {len(data_ids)}")
+
+            update_data = {
+                "persona": persona_json,
+                "computed_from_data_ids": [str(uid) for uid in data_ids],
+                "version": version,
+            }
+
+            response = (
+                self.supabase.client.table(self.table_name)
+                .update(update_data)
+                .eq("person_id", str(person_id))
+                .execute()
+            )
+
+            if not response.data or len(response.data) == 0:
+                logger.warning(f"Persona not found for update: {person_id}")
+                raise ValueError(f"Persona not found for person: {person_id}")
+
+            persona_data = response.data[0]
+            logger.info(f"Persona updated for person {person_id} to version {version}")
+
+            return PersonaInDB(**persona_data)
+
+        except APIError as e:
+            logger.error(f"Database error updating persona for person {person_id}: {str(e)}")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error updating persona for person {person_id}: {str(e)}")
+            raise APIError(f"Failed to update persona: {str(e)}")
+
+    async def upsert(
+        self,
+        person_id: UUID,
+        persona_json: Dict[str, Any],
+        data_ids: List[UUID],
+        version: int = 1
+    ) -> PersonaInDB:
+        """
+        Create or update persona for a person (upsert).
+
+        Atomically creates a new persona if one doesn't exist,
+        or updates the existing one. Handles version tracking.
+
+        Args:
+            person_id: UUID of the person
+            persona_json: Persona JSON
+            data_ids: List of person_data IDs
+            version: Version number (1 for new, incremented for updates)
+
+        Returns:
+            PersonaInDB: Created or updated persona
+
+        Raises:
+            APIError: If database operation fails
+        """
+        try:
+            logger.debug(f"PersonaRepository.upsert() for person_id: {person_id}")
+
+            # Check if persona exists
+            existing = await self.get_by_person_id(person_id)
+
+            if existing:
+                # Update existing
+                return await self.update_by_person_id(person_id, persona_json, data_ids, version)
+            else:
+                # Create new
+                return await self.create_for_person(person_id, persona_json, data_ids, version)
+
+        except Exception as e:
+            logger.error(f"Error in upsert for person {person_id}: {str(e)}")
             raise
 
 
