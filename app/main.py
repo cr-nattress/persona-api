@@ -115,6 +115,54 @@ async def health_check():
     }
 
 
+@app.post("/migrate", tags=["Admin"])
+async def run_migration():
+    """
+    Apply pending database migrations (development only).
+
+    This endpoint applies the 002_create_person_aggregate_schema.sql migration
+    to add first_name, last_name, and gender columns to the persons table.
+    """
+    import os
+    from pathlib import Path
+
+    if not settings.is_development:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Migration endpoint only available in development mode"
+        )
+
+    try:
+        # Read migration file
+        migration_path = Path(__file__).parent.parent / "db" / "migrations" / "002_create_person_aggregate_schema.sql"
+        if not migration_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Migration file not found: {migration_path}"
+            )
+
+        with open(migration_path, 'r') as f:
+            sql_content = f.read()
+
+        # For now, return the SQL that needs to be applied
+        logger.warning("Migration endpoint called - SQL content prepared for manual execution")
+
+        return {
+            "status": "pending",
+            "message": "Migration SQL prepared",
+            "migration_file": "002_create_person_aggregate_schema.sql",
+            "instructions": "This migration needs to be applied manually via Supabase dashboard SQL Editor",
+            "sql_content": sql_content
+        }
+
+    except Exception as e:
+        logger.error(f"Migration error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Migration failed: {str(e)}"
+        )
+
+
 if __name__ == "__main__":
     import uvicorn
 

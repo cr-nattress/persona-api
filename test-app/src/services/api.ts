@@ -65,13 +65,25 @@ function handleApiError(error: unknown, endpoint: string): never {
 }
 
 /**
- * Create a new person
+ * Create a new person with optional demographic information
  *
+ * @param firstName - Optional first name of the person
+ * @param lastName - Optional last name of the person
+ * @param gender - Optional gender of the person
  * @returns The newly created person
  */
-export async function createPerson(): Promise<Person> {
+export async function createPerson(
+  firstName?: string,
+  lastName?: string,
+  gender?: string
+): Promise<Person> {
   const endpoint = `${API_BASE_URL}/v1/person`;
   const startTime = Date.now();
+
+  const requestBody: Record<string, string | null> = {};
+  if (firstName) requestBody.first_name = firstName;
+  if (lastName) requestBody.last_name = lastName;
+  if (gender) requestBody.gender = gender;
 
   try {
     const response = await fetch(endpoint, {
@@ -79,6 +91,7 @@ export async function createPerson(): Promise<Person> {
       headers: {
         'Content-Type': 'application/json',
       },
+      body: JSON.stringify(requestBody),
     });
 
     const duration = Date.now() - startTime;
@@ -89,6 +102,7 @@ export async function createPerson(): Promise<Person> {
       endpoint: '/v1/person',
       status: response.status,
       duration,
+      request: requestBody,
       response: data,
     });
 
@@ -104,6 +118,7 @@ export async function createPerson(): Promise<Person> {
       endpoint: '/v1/person',
       status: 0,
       duration,
+      request: requestBody,
       error: error instanceof Error ? error.message : 'Unknown error',
     });
     handleApiError(error, endpoint);
@@ -171,13 +186,14 @@ export async function addPersonDataAndRegenerate(
   rawText: string,
   source: DataSource
 ): Promise<AddDataAndRegenerateResponse> {
-  const endpoint = `${API_BASE_URL}/v1/person/${personId}/data-and-regenerate`;
-  const startTime = Date.now();
-
-  const requestBody = {
+  // Build query parameters
+  const queryParams = new URLSearchParams({
     raw_text: rawText,
     source: source,
-  };
+  });
+
+  const endpoint = `${API_BASE_URL}/v1/person/${personId}/data-and-regenerate?${queryParams.toString()}`;
+  const startTime = Date.now();
 
   try {
     const response = await fetch(endpoint, {
@@ -185,7 +201,6 @@ export async function addPersonDataAndRegenerate(
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(requestBody),
     });
 
     const duration = Date.now() - startTime;
@@ -193,10 +208,9 @@ export async function addPersonDataAndRegenerate(
 
     logApiCall({
       method: 'POST',
-      endpoint: `/v1/person/${personId}/data-and-regenerate`,
+      endpoint: `/v1/person/${personId}/data-and-regenerate?raw_text=...&source=${source}`,
       status: response.status,
       duration,
-      request: requestBody,
       response: data,
     });
 
@@ -209,10 +223,9 @@ export async function addPersonDataAndRegenerate(
     const duration = Date.now() - startTime;
     logApiCall({
       method: 'POST',
-      endpoint: `/v1/person/${personId}/data-and-regenerate`,
+      endpoint: `/v1/person/${personId}/data-and-regenerate?raw_text=...&source=${source}`,
       status: 0,
       duration,
-      request: requestBody,
       error: error instanceof Error ? error.message : 'Unknown error',
     });
     handleApiError(error, endpoint);

@@ -4,4 +4,44 @@ Based on these cleaned notes about a person, create a comprehensive persona JSON
 {cleaned_text}
 ---
 
+!!! CRITICAL - READ FIRST !!!
+At the TOP of the provided text, you will see a section marked with === DEMOGRAPHIC INFORMATION ===.
+This section contains AUTHORITATIVE data from the person database. You MUST use this data in the persona.
+
+SPECIFIC INSTRUCTIONS FOR DEMOGRAPHIC DATA:
+- If first_name is listed in the === DEMOGRAPHIC INFORMATION === section, set meta.name to exactly "[first_name] [last_name]" or just "[first_name]"
+- If last_name is listed in the === DEMOGRAPHIC INFORMATION === section, set meta.name to exactly "[first_name] [last_name]" or just "[last_name]"
+- If both first_name and last_name are listed, set meta.name to EXACTLY "[first_name] [last_name]"
+- If gender is listed in the === DEMOGRAPHIC INFORMATION === section, set meta.gender to EXACTLY that value
+- NEVER override database demographics with different names or genders inferred from the narrative text
+- ALWAYS use database demographics, even if different names or genders appear in the narrative
+
+CRITICAL INSTRUCTIONS FOR NAME EXTRACTION:
+- You MUST populate the "meta.name" field with the person's actual name
+- PRIORITY 1: If first_name and/or last_name are provided in the === DEMOGRAPHIC INFORMATION === section, use those EXACTLY
+- PRIORITY 2: If no demographic name is provided, apply the NAME EXTRACTION STRATEGY:
+  * Look for names that appear repeatedly across the provided text (cross-source consensus)
+  * Identify names in formal/professional contexts: titles, headers, email addresses, contact info, signatures
+  * Extract using linguistic patterns: "[Name] said...", "[Name] worked at...", "Name is...", professional headers
+  * When multiple names appear, use the one appearing most frequently or in the most formal context
+  * Distinguish person names from business/company names
+  * PRIORITIZE explicit extraction over inference - only infer if the name is not directly stated
+  * Use "Unknown" only as a last resort if the name cannot be extracted or reasonably inferred
+
+CRITICAL INSTRUCTIONS FOR GENDER:
+- You MUST populate the "meta.gender" field
+- PRIORITY 1: If gender is provided in the === DEMOGRAPHIC INFORMATION === section, use that value EXACTLY
+- PRIORITY 2: If no demographic gender is provided, infer from the text using pronouns and context
+
+CRITICAL INSTRUCTIONS FOR AGE ESTIMATION:
+- You MUST populate the "meta.age" field with a specific estimate (e.g., "42", "mid-40s", "35-45", "Late 40s")
+- NEVER use "Unknown" for age
+- Estimate based on career stage, life events, technology adoption, family status, or other contextual clues
+- If age cannot be estimated from explicit clues, look for patterns (someone with 10+ years in a career is likely in their 30s-50s, etc.)
+
+CRITICAL INSTRUCTIONS FOR OTHER META FIELDS:
+- Include all available identifying information: role, location, and other details
+- When information comes from multiple sources, use consensus (if 2+ sources agree on a detail, it's reliable)
+- Distinguish between explicitly stated facts vs. inferred information
+
 Generate a complete persona JSON object capturing all dimensions of this person's identity, cognition, behavior, values, and goals. Make it detailed and nuanced.

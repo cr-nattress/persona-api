@@ -33,14 +33,18 @@ export function usePersons() {
   }, []);
 
   /**
-   * Create a new person and refresh the list
+   * Create a new person with optional demographic information and refresh the list
    */
-  const addNewPerson = useCallback(async (): Promise<Person> => {
+  const addNewPerson = useCallback(async (
+    firstName?: string,
+    lastName?: string,
+    gender?: string
+  ): Promise<Person> => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const newPerson = await createPerson();
+      const newPerson = await createPerson(firstName, lastName, gender);
       await refreshPersons();
       return newPerson;
     } catch (err) {

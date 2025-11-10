@@ -18,18 +18,35 @@ class PersonBase(BaseModel):
     Related data (submissions, computed personas) are accessed via person_id.
     """
 
-    pass  # Aggregate root has no mutable fields other than timestamps
+    first_name: Optional[str] = Field(
+        None,
+        min_length=1,
+        max_length=255,
+        description="First name of the person"
+    )
+    last_name: Optional[str] = Field(
+        None,
+        min_length=1,
+        max_length=255,
+        description="Last name of the person"
+    )
+    gender: Optional[str] = Field(
+        None,
+        min_length=1,
+        max_length=50,
+        description="Gender of the person (e.g., male, female, other, prefer not to say)"
+    )
 
 
-class PersonCreate(BaseModel):
+class PersonCreate(PersonBase):
     """
     Model for creating a new person.
 
-    Creates the aggregate root with no initial data.
+    Creates the aggregate root with optional demographic information.
     Data submissions are added subsequently via separate endpoints.
     """
 
-    pass  # Person creation requires no input
+    pass  # Inherits first_name, last_name, gender from PersonBase
 
 
 class PersonInDB(PersonBase):

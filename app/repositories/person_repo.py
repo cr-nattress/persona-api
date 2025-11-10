@@ -23,12 +23,22 @@ class PersonRepository:
         self.supabase = get_supabase_client()
         self.table_name = "persons"
 
-    async def create(self) -> PersonInDB:
+    async def create(
+        self,
+        first_name: Optional[str] = None,
+        last_name: Optional[str] = None,
+        gender: Optional[str] = None
+    ) -> PersonInDB:
         """
         Create a new person aggregate root.
 
-        The person is created with minimal data. Related submissions
-        (person_data) and computed personas are added separately.
+        The person is created with optional demographic information.
+        Related submissions (person_data) and computed personas are added separately.
+
+        Args:
+            first_name: Optional first name of the person
+            last_name: Optional last name of the person
+            gender: Optional gender of the person
 
         Returns:
             PersonInDB: Created person with ID and timestamps
@@ -38,8 +48,18 @@ class PersonRepository:
         """
         try:
             logger.debug(f"PersonRepository.create() called - creating new person aggregate root")
+            logger.debug(f"  - first_name: {first_name}")
+            logger.debug(f"  - last_name: {last_name}")
+            logger.debug(f"  - gender: {gender}")
 
-            data = {}  # Persons table only has id and timestamps (auto-generated)
+            # Build data dict with only non-None values
+            data = {}
+            if first_name is not None:
+                data["first_name"] = first_name
+            if last_name is not None:
+                data["last_name"] = last_name
+            if gender is not None:
+                data["gender"] = gender
 
             response = (
                 self.supabase.client.table(self.table_name)
@@ -53,6 +73,9 @@ class PersonRepository:
 
             person_data = response.data[0]
             logger.debug(f"Person created successfully with ID: {person_data.get('id')}")
+            logger.debug(f"  - first_name: {person_data.get('first_name')}")
+            logger.debug(f"  - last_name: {person_data.get('last_name')}")
+            logger.debug(f"  - gender: {person_data.get('gender')}")
 
             return PersonInDB(**person_data)
 

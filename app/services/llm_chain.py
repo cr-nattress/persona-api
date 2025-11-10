@@ -194,6 +194,76 @@ class PersonaLLMChain:
             logger.error(f"Step 2 failed: {e}")
             raise ValueError(f"Persona generation failed: {e}") from e
 
+    async def step2_populate_persona_with_demographics(
+        self, cleaned_text: str, demographic_context: str
+    ) -> Dict[str, Any]:
+        """
+        Step 2: Generate persona JSON with demographic context injected.
+
+        This method injects demographic information directly before persona generation,
+        ensuring database demographics take absolute priority over extracted values.
+
+        Args:
+            cleaned_text: Cleaned and organized notes from Step 1
+            demographic_context: Formatted demographic information from database
+
+        Returns:
+            Structured persona JSON as dictionary
+
+        Raises:
+            ValueError: If persona generation or JSON parsing fails
+        """
+        try:
+            logger.debug("Starting Step 2: Persona Population with Demographics")
+
+            # Prepend demographic context to cleaned text for Step 2
+            enhanced_text = demographic_context + "\n" + cleaned_text
+            logger.debug(f"Enhanced text with demographics: {len(enhanced_text)} chars")
+
+            # Create prompt
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", self.step2_system),
+                ("human", self.step2_user),
+            ])
+
+            # Create chain
+            chain = prompt | self.model
+
+            # Log LLM request
+            log_llm_request(
+                model=settings.openai_model,
+                messages=[
+                    {"role": "system", "content": self.step2_system},
+                    {"role": "user", "content": self.step2_user.replace("{cleaned_text}", enhanced_text[:200])},
+                ],
+                temperature=0.7,
+                max_tokens=2000,
+            )
+
+            # Run chain with timing
+            logger.debug("Generating persona JSON with demographics...")
+            start_time = time.time()
+            result = await chain.ainvoke({"cleaned_text": enhanced_text})
+            latency_ms = (time.time() - start_time) * 1000
+
+            persona_text = result.content
+
+            # Log LLM response
+            log_llm_response(
+                model=settings.openai_model,
+                response_text=persona_text,
+                latency_ms=latency_ms,
+            )
+
+            # Parse JSON
+            persona_json = self._safe_json_parse(persona_text)
+            logger.info(f"Step 2 completed with demographics: Persona JSON generated (latency: {latency_ms:.0f}ms)")
+            return persona_json
+
+        except Exception as e:
+            logger.error(f"Step 2 with demographics failed: {e}")
+            raise ValueError(f"Persona generation failed: {e}") from e
+
     def _safe_json_parse(self, text: str) -> Dict[str, Any]:
         """
         Safely parse JSON from text, handling common issues.
@@ -270,12 +340,13 @@ class PersonaLLMChain:
         logger.error(f"  - Text contains closing brace: {has_close_brace}")
         raise ValueError("Could not parse JSON response from LLM")
 
-    async def generate_persona(self, raw_text: str) -> Dict[str, Any]:
+    async def generate_persona(self, raw_text: str, demographic_context: Optional[str] = None) -> Dict[str, Any]:
         """
         Generate a complete persona from raw text (both steps).
 
         Args:
             raw_text: Unstructured text about a person
+            demographic_context: Optional demographic information to inject into Step 2
 
         Returns:
             Complete persona JSON
@@ -288,15 +359,20 @@ class PersonaLLMChain:
             logger.debug(f"Input text length: {len(raw_text)} chars")
             logger.debug(f"Input raw_text type: {type(raw_text)}")
             logger.debug(f"Input raw_text preview: {raw_text[:150]}")
+            if demographic_context:
+                logger.debug(f"Demographic context provided: {len(demographic_context)} chars")
 
             # Step 1: Clean text
             logger.debug("Executing Step 1: Clean text...")
             cleaned_text = await self.step1_clean_text(raw_text)
             logger.debug(f"Step 1 complete: cleaned_text type={type(cleaned_text)}, length={len(cleaned_text)}")
 
-            # Step 2: Populate persona
+            # Step 2: Populate persona (with optional demographic context)
             logger.debug("Executing Step 2: Populate persona...")
-            persona = await self.step2_populate_persona(cleaned_text)
+            if demographic_context:
+                persona = await self.step2_populate_persona_with_demographics(cleaned_text, demographic_context)
+            else:
+                persona = await self.step2_populate_persona(cleaned_text)
 
             logger.debug(f"Step 2 complete: persona type={type(persona)}")
             logger.debug(f"Step 2 result is dict: {isinstance(persona, dict)}")

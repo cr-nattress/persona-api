@@ -16,12 +16,18 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 CREATE TABLE IF NOT EXISTS public.persons (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    first_name VARCHAR(255) NULL,
+    last_name VARCHAR(255) NULL,
+    gender VARCHAR(50) NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 COMMENT ON TABLE public.persons IS 'Person aggregate root. Represents a unique individual with related data and personas.';
 COMMENT ON COLUMN public.persons.id IS 'Unique identifier (UUID v4)';
+COMMENT ON COLUMN public.persons.first_name IS 'First name of the person (optional)';
+COMMENT ON COLUMN public.persons.last_name IS 'Last name of the person (optional)';
+COMMENT ON COLUMN public.persons.gender IS 'Gender of the person: male, female, other, prefer not to say (optional)';
 COMMENT ON COLUMN public.persons.created_at IS 'Timestamp when person record created';
 COMMENT ON COLUMN public.persons.updated_at IS 'Timestamp when person record last updated';
 

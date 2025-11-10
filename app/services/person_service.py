@@ -45,12 +45,22 @@ class PersonService:
     # Person Aggregate Root Operations
     # ========================================================================
 
-    async def create_person(self) -> PersonInDB:
+    async def create_person(
+        self,
+        first_name: Optional[str] = None,
+        last_name: Optional[str] = None,
+        gender: Optional[str] = None
+    ) -> PersonInDB:
         """
         Create a new person aggregate root.
 
-        The person is created with minimal data. Related submissions and
-        personas are added separately via dedicated endpoints.
+        The person is created with optional demographic information.
+        Related submissions and personas are added separately via dedicated endpoints.
+
+        Args:
+            first_name: Optional first name of the person
+            last_name: Optional last name of the person
+            gender: Optional gender of the person
 
         Returns:
             PersonInDB: Created person with ID and timestamps
@@ -59,9 +69,16 @@ class PersonService:
             ValueError: If creation fails
         """
         logger.info("PersonService: Creating new person aggregate root")
+        logger.debug(f"  - first_name: {first_name}")
+        logger.debug(f"  - last_name: {last_name}")
+        logger.debug(f"  - gender: {gender}")
 
         try:
-            person = await self.person_repo.create()
+            person = await self.person_repo.create(
+                first_name=first_name,
+                last_name=last_name,
+                gender=gender
+            )
             logger.info(f"Person created: {person.id}")
             return person
 
@@ -306,11 +323,12 @@ class PersonService:
         Recompute persona from all accumulated data.
 
         This is the core business logic that makes persona improvement possible:
-        1. Fetch ALL person_data submissions (ordered by creation time)
-        2. Concatenate all raw_text values with separators
-        3. Generate new persona JSON from accumulated text via LLM
-        4. Increment version number
-        5. Store new persona with lineage tracking (data IDs used)
+        1. Fetch the person's demographic data (first_name, last_name, gender)
+        2. Fetch ALL person_data submissions (ordered by creation time)
+        3. Concatenate all raw_text values with separators
+        4. Generate new persona JSON from accumulated text + demographic data via LLM
+        5. Increment version number
+        6. Store new persona with lineage tracking (data IDs used)
 
         This method is called automatically when new data is added via
         add_person_data_and_regenerate().
@@ -327,6 +345,17 @@ class PersonService:
         logger.info(f"PersonService: Recomputing persona for person {person_id}")
 
         try:
+            # Fetch the person's demographic data
+            person = await self.person_repo.read(person_id)
+            if not person:
+                logger.error(f"Person not found: {person_id}")
+                raise ValueError(f"Person not found: {person_id}")
+
+            logger.debug(f"Person demographic data:")
+            logger.debug(f"  - first_name: {person.first_name}")
+            logger.debug(f"  - last_name: {person.last_name}")
+            logger.debug(f"  - gender: {person.gender}")
+
             # Get all accumulated data for this person
             all_data = await self.person_data_repo.get_all_for_person_unordered(person_id)
 
@@ -340,8 +369,20 @@ class PersonService:
             accumulated_text = self._concatenate_person_data(all_data)
             logger.debug(f"Accumulated text length: {len(accumulated_text)}")
 
-            # Generate new persona from accumulated text via LLM
-            persona_json = await self.llm_chain.generate_persona(accumulated_text)
+            # Build demographic context to be injected into persona generation
+            demographic_context = self._build_demographic_context(person)
+            if demographic_context.strip() != "=== DEMOGRAPHIC INFORMATION (from person table) ===\nUse this information as the authoritative source for the person's demographics.\n\n(No demographic information set)\n\n=== END DEMOGRAPHIC INFORMATION ===":
+                logger.debug(f"Demographic context provided: {len(demographic_context)} chars")
+                logger.debug(f"Demographics: first_name={person.first_name}, last_name={person.last_name}, gender={person.gender}")
+            else:
+                logger.debug(f"No demographic information available")
+
+            # Generate new persona from accumulated text + demographic data via LLM
+            # Pass demographic context as separate parameter to ensure it takes priority
+            persona_json = await self.llm_chain.generate_persona(
+                accumulated_text,
+                demographic_context=demographic_context
+            )
             logger.debug(f"LLM generated persona JSON")
 
             # Get current persona to determine version
@@ -371,6 +412,46 @@ class PersonService:
         except Exception as e:
             logger.error(f"Failed to recompute persona for {person_id}: {str(e)}")
             raise ValueError(f"Failed to recompute persona: {str(e)}")
+
+    def _build_demographic_context(self, person: PersonInDB) -> str:
+        """
+        Build a context string with demographic information for the LLM.
+
+        This ensures the LLM always uses the person's actual demographic data
+        from the database rather than trying to infer it from unstructured text.
+
+        Args:
+            person: PersonInDB instance with demographic data
+
+        Returns:
+            str: Formatted demographic context for the LLM
+        """
+        parts = []
+
+        # Add demographic header
+        parts.append("=== DEMOGRAPHIC INFORMATION (from person table) ===")
+        parts.append("Use this information as the authoritative source for the person's demographics.")
+        parts.append("")
+
+        # Add each demographic field if present
+        if person.first_name:
+            parts.append(f"First Name: {person.first_name}")
+        if person.last_name:
+            parts.append(f"Last Name: {person.last_name}")
+        if person.gender:
+            parts.append(f"Gender: {person.gender}")
+
+        # If no demographics are set, note that
+        if not (person.first_name or person.last_name or person.gender):
+            parts.append("(No demographic information set)")
+
+        parts.append("")
+        parts.append("=== END DEMOGRAPHIC INFORMATION ===")
+        parts.append("")
+
+        result = "\n".join(parts)
+        logger.debug(f"Built demographic context: {len(result)} chars")
+        return result
 
     def _concatenate_person_data(self, submissions: List[PersonDataInDB]) -> str:
         """

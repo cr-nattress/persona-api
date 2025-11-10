@@ -50,7 +50,11 @@ export default function Home() {
           const persona = await getPersona(personId);
           setCurrentPersona(persona);
         } catch (err) {
-          console.error('Failed to load persona:', err);
+          const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+          // Only log if it's not a 404 (persona not found yet)
+          if (!errorMessage.includes('404')) {
+            console.error('Failed to load persona:', err);
+          }
           // Not a critical error - user can still submit data
         } finally {
           setIsLoadingPersona(false);
@@ -60,12 +64,16 @@ export default function Home() {
   }, [persons]);
 
   /**
-   * Handle creating new person
+   * Handle creating new person with optional demographic information
    */
-  const handleCreateNewPerson = useCallback(async () => {
+  const handleCreateNewPerson = useCallback(async (
+    firstName?: string,
+    lastName?: string,
+    gender?: string
+  ) => {
     setError(null);
     try {
-      const newPerson = await addNewPerson();
+      const newPerson = await addNewPerson(firstName, lastName, gender);
       setSelectedPersonId(newPerson.id);
       setCurrentPersona(null);
     } catch (err) {

@@ -8,7 +8,7 @@ and persona retrieval with versioning and lineage tracking.
 from fastapi import APIRouter, HTTPException, Query, status
 from typing import Optional, List
 from uuid import UUID
-from app.models.person import PersonResponse, PersonInDB
+from app.models.person import PersonResponse, PersonInDB, PersonCreate
 from app.models.person_data import PersonDataResponse, PersonDataListResponse
 from app.models.persona import PersonaResponse, PersonaWithHistory
 from app.services.person_service import get_person_service
@@ -31,28 +31,40 @@ router = APIRouter(prefix="/v1/person", tags=["Person"])
     summary="Create a new person",
     responses={
         201: {"description": "Person created successfully"},
+        400: {"description": "Invalid request data"},
         500: {"description": "Internal server error"},
     },
 )
-async def create_person() -> PersonResponse:
+async def create_person(person_create: PersonCreate) -> PersonResponse:
     """
     Create a new person aggregate root.
 
-    Creates a new person with no initial data. Data submissions and personas
-    are added separately via dedicated endpoints.
+    Creates a new person with optional demographic information (first_name, last_name, gender).
+    Data submissions and personas are added separately via dedicated endpoints.
+
+    Args:
+        person_create: Optional person creation data with first_name, last_name, gender
 
     Returns:
-        PersonResponse: Created person with ID, timestamps, and metadata
+        PersonResponse: Created person with ID, timestamps, demographic info, and metadata
 
     Raises:
         HTTPException: If creation fails
     """
     try:
         logger.info("POST /v1/person - Creating new person")
+        logger.debug(f"  - first_name: {person_create.first_name}")
+        logger.debug(f"  - last_name: {person_create.last_name}")
+        logger.debug(f"  - gender: {person_create.gender}")
+
         service = get_person_service()
 
-        # Create person
-        person = await service.create_person()
+        # Create person with demographic data
+        person = await service.create_person(
+            first_name=person_create.first_name,
+            last_name=person_create.last_name,
+            gender=person_create.gender
+        )
 
         # Build response with metadata
         response = PersonResponse(
